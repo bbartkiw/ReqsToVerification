@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
-import { coverage, traceabilityMatrix, type CoverageBucket } from '../../core/analysis';
+import { coverage, type CoverageBucket } from '../../core/analysis';
 import { Bar, Badge, pct, useApp } from '../ui';
+import { MatrixView } from './MatrixView';
 
 function Buckets({ title, items }: { title: string; items: CoverageBucket[] }) {
   return (
@@ -26,7 +27,6 @@ export function Dashboard() {
   const { data } = useApp();
   const [view, setView] = useState<'coverage' | 'matrix'>('coverage');
   const cov = useMemo(() => coverage(data), [data]);
-  const matrix = useMemo(() => traceabilityMatrix(data), [data]);
 
   return (
     <>
@@ -69,22 +69,7 @@ export function Dashboard() {
           </div>
         </>
       ) : (
-        <div style={{ overflow: 'auto' }}>
-          <table className="grid matrix">
-            <thead>
-              <tr><th>Requirement</th>{matrix.tests.map((t) => <th key={t.id} title={t.title}>{t.tid}</th>)}</tr>
-            </thead>
-            <tbody>
-              {matrix.requirements.map((r) => (
-                <tr key={r.id}>
-                  <td title={r.title}>{r.reqId} <span className="muted">{r.title}</span></td>
-                  {matrix.tests.map((t) => <td key={t.id}>{matrix.links.has(`${r.id}|${t.id}`) ? <span aria-label="linked">X</span> : ''}</td>)}
-                </tr>
-              ))}
-              {matrix.requirements.length === 0 && <tr><td className="muted">No requirements.</td></tr>}
-            </tbody>
-          </table>
-        </div>
+        <MatrixView />
       )}
     </>
   );

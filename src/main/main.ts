@@ -1,7 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import { promises as fs } from 'node:fs';
 import { basename, join } from 'node:path';
-import { buildPlanHtml, buildPlanWorkbook } from '../core/export';
+import { buildEquipmentWorkbook, buildPlanHtml, buildPlanWorkbook } from '../core/export';
 import { importSources, mapRows, sourceForFile, guessMapping, type ColumnMapping, type RawTable } from '../core/importers';
 import { JsonFileRepository } from '../core/repository';
 import { applyImport, ProjectService } from '../core/service';
@@ -114,6 +114,15 @@ const handlers: Api = {
     const path = await pickSavePath('Export test plan', `${plan.name}-v${plan.version}`, 'xlsx', 'Excel');
     if (!path) return null;
     await fs.writeFile(path, await buildPlanWorkbook(service.getData(), plan));
+    shell.showItemInFolder(path);
+    return path;
+  },
+
+  async exportEquipmentList(planId) {
+    const plan = findPlan(planId);
+    const path = await pickSavePath('Export equipment list', `${plan.name}-equipment`, 'xlsx', 'Excel');
+    if (!path) return null;
+    await fs.writeFile(path, await buildEquipmentWorkbook(service.getData(), plan));
     shell.showItemInFolder(path);
     return path;
   },

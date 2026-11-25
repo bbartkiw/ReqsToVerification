@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import ExcelJS from 'exceljs';
-import { analysePlan, calibrationState, coverage, selectTestsByScope, suggestOrder } from '../src/core/analysis';
-import { buildPlanHtml, buildPlanWorkbook } from '../src/core/export';
+import { analysePlan, calibrationState, coverage, equipmentList, selectTestsByScope, suggestOrder } from '../src/core/analysis';
+import { buildEquipmentWorkbook, buildPlanHtml, buildPlanWorkbook } from '../src/core/export';
 import { extractLimits, generateTestCases } from '../src/core/generate';
 import { csvSource, excelSource, guessMapping, mapRows, parseStandards } from '../src/core/importers';
 import { MemoryRepository } from '../src/core/repository';
@@ -119,6 +119,24 @@ describe('test case generation', () => {
     expect(created.plan?.items).toHaveLength(6);
     expect(coverage(svc.getData()).percent).toBe(100);
     expect(generateTestCases(svc.getData())).toHaveLength(0); // everything covered now
+  });
+
+  it('lists required equipment for a plan, including items not in the catalogue', async () => {
+    const svc = await loadSample();
+    const scope = await svc.saveEquipment({
+      name: 'Oscilloscope', kind: 'standard', category: 'Measurement', model: 'DSO', serial: '', calibrationDue: '2030-01-01', status: 'available', notes: '',
+    });
+    const { tests, plan } = await svc.createGenerated(generateTestCases(svc.getData()), 'P');
+    const list = equipmentList(svc.getData(), plan!, new Date('2026-01-01T00:00:00Z'));
+    expect(list.items.map((i) => i.equipment.id)).toEqual([scope.id]);
+    expect(list.items[0].testCaseIds.length).toBeGreaterThan(0);
+    expect(list.items[0].requirementIds.length).toBeGreaterThan(0);
+    expect(list.missing.map((m) => m.need)).toContain('climate chamber');
+    expect(tests.length).toBe(6);
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load((await buildEquipmentWorkbook(svc.getData(), plan!)) as unknown as ArrayBuffer);
+    expect(wb.worksheets.map((w) => w.name)).toEqual(['Required equipment', 'Equipment to obtain']);
+    expect(analysePlan(svc.getData(), plan!).issues.some((i) => i.message.includes('not in catalogue'))).toBe(true);
   });
 
   it('groups many requirements into one test and splits one into several', async () => {

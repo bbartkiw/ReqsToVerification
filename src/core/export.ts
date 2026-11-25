@@ -1,5 +1,5 @@
 import ExcelJS from 'exceljs';
-import { analysePlan, coverage, traceabilityMatrix } from './analysis';
+import { analysePlan, coverage, equipmentList, traceabilityMatrix } from './analysis';
 import type { ProjectData, TestPlan } from './types';
 
 const reqLabel = (d: ProjectData, id: string): string => d.requirements.find((r) => r.id === id)?.reqId ?? '?';
@@ -13,6 +13,61 @@ function style(ws: ExcelJS.Worksheet): void {
   ws.columns.forEach((c) => {
     c.alignment = { vertical: 'top', wrapText: true };
   });
+}
+
+const tidList = (d: ProjectData, ids: string[]): string => ids.map((id) => d.testCases.find((t) => t.id === id)?.tid ?? '?').join(', ');
+
+function addEquipmentSheets(wb: ExcelJS.Workbook, d: ProjectData, plan: TestPlan, now: Date): void {
+  const list = equipmentList(d, plan, now);
+  const eq = wb.addWorksheet('Required equipment');
+  eq.columns = [
+    { header: 'Equipment', width: 30 },
+    { header: 'Kind', width: 17 },
+    { header: 'Category', width: 20 },
+    { header: 'Model', width: 20 },
+    { header: 'Serial / asset', width: 16 },
+    { header: 'Calibration due', width: 16 },
+    { header: 'Status', width: 14 },
+    { header: 'Problems', width: 30 },
+    { header: 'Tests', width: 8 },
+    { header: 'Used by tests', width: 36 },
+    { header: 'Requirements', width: 36 },
+    { header: 'Minutes in use', width: 14 },
+  ];
+  for (const u of list.items) {
+    eq.addRow([
+      u.equipment.name,
+      u.equipment.kind === 'company' ? 'company-specific' : 'standard',
+      u.equipment.category,
+      u.equipment.model,
+      u.equipment.serial,
+      u.equipment.calibrationDue,
+      u.equipment.status.replace(/_/g, ' '),
+      u.problems.join('; '),
+      u.testCaseIds.length,
+      tidList(d, u.testCaseIds),
+      u.requirementIds.map((r) => reqLabel(d, r)).join(', '),
+      u.minutes,
+    ]);
+  }
+  style(eq);
+
+  const miss = wb.addWorksheet('Equipment to obtain');
+  miss.columns = [
+    { header: 'Needed equipment (not in catalogue)', width: 50 },
+    { header: 'Used by tests', width: 36 },
+    { header: 'Requirements', width: 36 },
+  ];
+  for (const m of list.missing) miss.addRow([m.need, tidList(d, m.testCaseIds), m.requirementIds.map((r) => reqLabel(d, r)).join(', ')]);
+  style(miss);
+}
+
+/** Stand-alone Excel list of the equipment a plan needs. */
+export async function buildEquipmentWorkbook(d: ProjectData, plan: TestPlan, now = new Date()): Promise<Uint8Array> {
+  const wb = new ExcelJS.Workbook();
+  wb.created = now;
+  addEquipmentSheets(wb, d, plan, now);
+  return new Uint8Array(await wb.xlsx.writeBuffer());
 }
 
 /** Excel test plan: plan sheet, test case detail, traceability matrix, coverage. */
@@ -75,28 +130,7 @@ export async function buildPlanWorkbook(d: ProjectData, plan: TestPlan, now = ne
   });
   style(tests);
 
-  const eq = wb.addWorksheet('Equipment');
-  eq.columns = [
-    { header: 'Name', width: 30 },
-    { header: 'Kind', width: 12 },
-    { header: 'Model', width: 20 },
-    { header: 'Serial', width: 16 },
-    { header: 'Calibration due', width: 16 },
-    { header: 'Status', width: 14 },
-    { header: 'Used by tests', width: 40 },
-  ];
-  for (const u of report.equipmentUsage) {
-    eq.addRow([
-      u.equipment.name,
-      u.equipment.kind === 'company' ? 'company-specific' : 'standard',
-      u.equipment.model,
-      u.equipment.serial,
-      u.equipment.calibrationDue,
-      u.equipment.status,
-      u.testCaseIds.map((id) => d.testCases.find((t) => t.id === id)?.tid ?? '?').join(', '),
-    ]);
-  }
-  style(eq);
+  addEquipmentSheets(wb, d, plan, now);
 
   const matrix = traceabilityMatrix({ ...d, testCases: report.tests });
   const tm = wb.addWorksheet('Traceability');
@@ -155,6 +189,18 @@ export function buildPlanHtml(d: ProjectData, plan: TestPlan, now = new Date()):
 </section>`,
     )
     .join('\n');
+  const list = equipmentList(d, plan, now);
+  const equipRows = list.items
+    .map(
+      (u) =>
+        `<tr><td>${esc(u.equipment.name)}${u.equipment.model ? ` <span class="meta">${esc(u.equipment.model)}</span>` : ''}</td><td>${u.equipment.kind === 'company' ? 'company-specific' : 'standard'}</td><td>${esc(u.equipment.calibrationDue || '-')}</td><td>${esc(u.equipment.status.replace(/_/g, ' '))}</td><td>${esc(tidList(d, u.testCaseIds))}</td><td class="${u.problems.length ? 'warn' : ''}">${esc(u.problems.join('; '))}</td></tr>`,
+    )
+    .join('');
+  const missingHtml = list.missing.length
+    ? `<h3>Equipment to obtain (not in catalogue)</h3><table><tr><th>Needed</th><th>Tests</th></tr>${list.missing
+        .map((m) => `<tr><td>${esc(m.need)}</td><td>${esc(tidList(d, m.testCaseIds))}</td></tr>`)
+        .join('')}</table>`
+    : '';
   const issues = report.issues.length
     ? `<ul>${report.issues.map((i) => `<li class="${i.severity}">${esc(i.severity)}: ${esc(i.message)}</li>`).join('')}</ul>`
     : '<p>No issues found.</p>';
@@ -175,15 +221,11 @@ th{background:#e8eef8} .tc{page-break-inside:avoid;margin:16px 0;padding-top:8px
 <tr><th>Requirements covered by plan</th><td>${report.coveredRequirementIds.length}</td><th>Verifiable requirements not covered</th><td>${report.uncoveredInPlan.length}</td></tr>
 <tr><th>Project coverage</th><td colspan="3">${cov.covered} of ${cov.verifiable} verifiable requirements (${cov.percent}%)</td></tr>
 </table>
-<h2>Equipment</h2>
-<table><tr><th>Name</th><th>Kind</th><th>Calibration due</th><th>Status</th><th>Tests</th></tr>
-${report.equipmentUsage
-  .map(
-    (u) =>
-      `<tr><td>${esc(u.equipment.name)}</td><td>${u.equipment.kind === 'company' ? 'company-specific' : 'standard'}</td><td>${esc(u.equipment.calibrationDue || '-')}</td><td>${esc(u.equipment.status)}</td><td>${esc(u.testCaseIds.map((id) => d.testCases.find((t) => t.id === id)?.tid).join(', '))}</td></tr>`,
-  )
-  .join('')}
+<h2>Required equipment</h2>
+<table><tr><th>Equipment</th><th>Kind</th><th>Calibration due</th><th>Status</th><th>Tests</th><th>Problems</th></tr>
+${equipRows}
 </table>
+${missingHtml}
 <h2>Issues</h2>${issues}
 <h2>Test cases</h2>
 ${rows}

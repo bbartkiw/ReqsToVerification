@@ -235,6 +235,7 @@ export class ProjectService {
         environment: p.environment,
         requirementIds: p.requirementIds,
         equipmentIds: p.equipmentIds,
+        missingEquipment: p.missingEquipment,
         status: 'draft',
         estimatedMinutes: p.estimatedMinutes,
         suspect: false,

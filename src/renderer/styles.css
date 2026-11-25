@@ -81,7 +81,21 @@ dialog .dlg-foot { padding: 10px 16px; border-top: 1px solid var(--line); displa
 .split { display: grid; grid-template-columns: 260px 1fr; gap: 12px; align-items: start; }
 .list button { display: block; width: 100%; text-align: left; margin-bottom: 4px; }
 .list button[aria-current='true'] { border-color: var(--accent); background: #eaf1fc; }
-.matrix td, .matrix th { text-align: center; padding: 3px 6px; }
-.matrix td:first-child, .matrix th:first-child { text-align: left; }
+.tooltip { position: fixed; z-index: 100; max-width: 430px; background: #1b2a41; color: #fff; padding: 8px 10px; border-radius: 6px; font-size: 13px; line-height: 1.4; box-shadow: 0 4px 14px rgba(0,0,0,.3); pointer-events: none; }
+.tooltip .tt-id { font-weight: 600; }
+.tooltip .tt-meta { color: #b8c3d6; font-size: 12px; margin-top: 4px; }
+.matrix-wrap { overflow: auto; max-height: calc(100vh - 230px); border: 1px solid var(--line); background: var(--panel); }
+table.matrix { border-collapse: separate; border-spacing: 0; font-size: 13px; }
+.matrix th, .matrix td { border-bottom: 1px solid #e6e9ee; border-right: 1px solid #eef0f4; padding: 0; text-align: center; background: var(--panel); }
+.matrix thead th { position: sticky; top: 0; z-index: 2; background: #eef0f4; padding: 6px 4px; font-weight: 600; min-width: 62px; cursor: default; }
+.matrix th.rowhead { position: sticky; left: 0; z-index: 1; background: #f7f8fa; text-align: left; padding: 4px 10px; min-width: 150px; white-space: nowrap; cursor: default; font-weight: 600; }
+.matrix thead th.corner { left: 0; z-index: 3; text-align: left; padding-left: 10px; }
+.matrix td { height: 28px; min-width: 62px; }
+.matrix td.link { color: var(--accent); font-weight: 700; font-size: 16px; }
+.matrix tr.hl td, .matrix tr.hl th.rowhead { background: #eaf1fc; }
+.matrix td.hlc, .matrix thead th.hlc { background: #eaf1fc; }
+.matrix td.link.hlc, .matrix tr.hl td.link { background: #d6e6fb; }
+.matrix tr.nolink th.rowhead { box-shadow: inset 4px 0 0 var(--err); }
+.matrix td.total { font-weight: 600; color: var(--muted); min-width: 40px; }
 .issue-error { color: var(--err); } .issue-warning { color: var(--warn); } .issue-info { color: var(--muted); }
 ul.plain { margin: 0; padding-left: 18px; }

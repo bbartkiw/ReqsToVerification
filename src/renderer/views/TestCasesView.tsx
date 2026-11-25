@@ -87,7 +87,7 @@ function TestCaseDialog({ initial, onClose }: { initial: Partial<TestCase>; onCl
     set('steps', steps.map((s, n) => (n === i ? { ...s, [k]: v } : s)));
 
   const save = async () => {
-    const ok = await apply(window.api.saveTestCase({ ...(t as TestCase), steps: steps.filter((s) => s.action.trim() || s.expected.trim()) }));
+    const ok = await apply(window.api.saveTestCase({ ...(t as TestCase), steps: steps.filter((s) => s.action.trim() || s.expected.trim()), missingEquipment: (t.missingEquipment ?? []).map((s) => s.trim()).filter(Boolean) }));
     if (ok) onClose();
   };
 
@@ -143,6 +143,16 @@ function TestCaseDialog({ initial, onClose }: { initial: Partial<TestCase>; onCl
           selected={t.equipmentIds ?? []}
           onChange={(v) => set('equipmentIds', v)}
         />
+        <Field label="Equipment needed but not in the catalogue (one per line)" full>
+          {(id) => (
+            <textarea
+              id={id}
+              value={(t.missingEquipment ?? []).join('\n')}
+              onChange={(e) => set('missingEquipment', e.target.value.split('\n'))}
+              onBlur={() => set('missingEquipment', (t.missingEquipment ?? []).map((s) => s.trim()).filter(Boolean))}
+            />
+          )}
+        </Field>
       </div>
     </Modal>
   );

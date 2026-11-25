@@ -104,6 +104,35 @@ export function MultiPicker(props: {
   );
 }
 
+/**
+ * Hover / focus tooltip rendered at fixed position, so it is not clipped by
+ * scrolling tables. Attach `show`/`hide` to mouse and focus events.
+ */
+export function useTooltip() {
+  const [tip, setTip] = useState<{ x: number; y: number; above: boolean; content: ReactNode } | null>(null);
+  const show = (el: Element, content: ReactNode) => {
+    const r = el.getBoundingClientRect();
+    const above = r.bottom > window.innerHeight - 220;
+    setTip({
+      x: Math.max(8, Math.min(r.left, window.innerWidth - 440)),
+      y: above ? r.top - 6 : r.bottom + 6,
+      above,
+      content,
+    });
+  };
+  const hide = () => setTip(null);
+  const node = tip && (
+    <div
+      role="tooltip"
+      className="tooltip"
+      style={{ left: tip.x, top: tip.y, transform: tip.above ? 'translateY(-100%)' : undefined }}
+    >
+      {tip.content}
+    </div>
+  );
+  return { show, hide, node };
+}
+
 export const Badge = (props: { kind?: 'ok' | 'warn' | 'err' | 'company'; children: ReactNode }) => (
   <span className={`badge ${props.kind ?? ''}`}>{props.children}</span>
 );

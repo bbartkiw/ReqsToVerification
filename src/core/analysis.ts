@@ -115,6 +115,78 @@ export interface EquipmentUsage {
   testCaseIds: string[];
 }
 
+export type CalibrationState = 'none' | 'ok' | 'due-soon' | 'expired';
+
+export interface RequiredEquipment {
+  equipment: Equipment;
+  testCaseIds: string[];
+  /** Requirements that depend on this equipment via the plan's tests. */
+  requirementIds: string[];
+  minutes: number;
+  calibration: CalibrationState;
+  /** Why this item may not be usable, empty when fine. */
+  problems: string[];
+}
+
+export interface MissingEquipment {
+  need: string;
+  testCaseIds: string[];
+  requirementIds: string[];
+}
+
+export interface EquipmentList {
+  /** Catalogue items needed by the plan: standard first, then company-specific. */
+  items: RequiredEquipment[];
+  /** Needs recorded on tests that have no catalogue item yet. */
+  missing: MissingEquipment[];
+}
+
+/** Consolidated list of the equipment a plan needs, with where and why. */
+export function equipmentList(d: ProjectData, plan: TestPlan, now: Date = new Date()): EquipmentList {
+  const tests = plan.items
+    .slice()
+    .sort((a, b) => a.order - b.order)
+    .map((i) => d.testCases.find((t) => t.id === i.testCaseId))
+    .filter((t): t is TestCase => !!t);
+  const items = new Map<string, RequiredEquipment>();
+  const missing = new Map<string, MissingEquipment>();
+  for (const t of tests) {
+    for (const eid of t.equipmentIds) {
+      const e = d.equipment.find((x) => x.id === eid);
+      if (!e) continue;
+      const cal = calibrationState(e, now);
+      const it = items.get(eid) ?? {
+        equipment: e,
+        testCaseIds: [],
+        requirementIds: [],
+        minutes: 0,
+        calibration: cal,
+        problems: [
+          ...(cal === 'expired' ? [`calibration expired ${e.calibrationDue}`] : cal === 'due-soon' ? [`calibration due ${e.calibrationDue}`] : []),
+          ...(e.status === 'in_repair' ? ['in repair'] : e.status === 'to_be_built' ? ['still to be built'] : []),
+        ],
+      };
+      it.testCaseIds.push(t.id);
+      it.minutes += t.estimatedMinutes || 0;
+      for (const r of t.requirementIds) if (!it.requirementIds.includes(r)) it.requirementIds.push(r);
+      items.set(eid, it);
+    }
+    for (const need of t.missingEquipment ?? []) {
+      const key = need.trim().toLowerCase();
+      if (!key) continue;
+      const m = missing.get(key) ?? { need: need.trim(), testCaseIds: [], requirementIds: [] };
+      m.testCaseIds.push(t.id);
+      for (const r of t.requirementIds) if (!m.requirementIds.includes(r)) m.requirementIds.push(r);
+      missing.set(key, m);
+    }
+  }
+  const rank = (r: RequiredEquipment): number => (r.equipment.kind === 'standard' ? 0 : 1);
+  return {
+    items: [...items.values()].sort((a, b) => rank(a) - rank(b) || a.equipment.name.localeCompare(b.equipment.name)),
+    missing: [...missing.values()].sort((a, b) => a.need.localeCompare(b.need)),
+  };
+}
+
 export interface PlanReport {
   tests: TestCase[];
   totalMinutes: number;
@@ -127,7 +199,7 @@ export interface PlanReport {
 
 const DAY = 86_400_000;
 
-export function calibrationState(e: Equipment, now: Date, warnDays = 30): 'none' | 'ok' | 'due-soon' | 'expired' {
+export function calibrationState(e: Equipment, now: Date, warnDays = 30): CalibrationState {
   if (!e.calibrationDue) return 'none';
   const due = Date.parse(e.calibrationDue);
   if (Number.isNaN(due)) return 'none';
@@ -185,6 +257,13 @@ export function analysePlan(d: ProjectData, plan: TestPlan, now: Date = new Date
       issues.push({ severity: 'error', equipmentId: e.id, message: `${e.name} is in repair.` });
     if (e.status === 'to_be_built')
       issues.push({ severity: 'warning', equipmentId: e.id, message: `${e.name} has still to be built.` });
+  }
+
+  for (const m of equipmentList(d, plan, now).missing) {
+    issues.push({
+      severity: 'warning',
+      message: `Equipment not in catalogue: ${m.need} (needed by ${m.testCaseIds.map((id) => d.testCases.find((t) => t.id === id)?.tid ?? '?').join(', ')}).`,
+    });
   }
 
   const covered = coveredRequirementIds(tests);

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { analysePlan, selectTestsByScope, suggestOrder } from '../../core/analysis';
+import { analysePlan, equipmentList, selectTestsByScope, suggestOrder } from '../../core/analysis';
 import { PLAN_STATUSES, type EquipmentScope, type TestPlan } from '../../core/types';
 import { Badge, Field, Select, useApp } from '../ui';
 
@@ -40,6 +40,11 @@ export function PlansView() {
 
   const report = useMemo(
     () => (draft ? analysePlan(data, { ...(draft as TestPlan), id: draft.id ?? '' }) : null),
+    [data, draft],
+  );
+
+  const equip = useMemo(
+    () => (draft ? equipmentList(data, { ...(draft as TestPlan), id: draft.id ?? '' }) : { items: [], missing: [] }),
     [data, draft],
   );
 
@@ -180,9 +185,65 @@ export function PlansView() {
             {report.issues.length === 0 ? <p className="issue-info">No issues found.</p> : (
               <ul className="plain">{report.issues.map((i, n) => <li key={n} className={`issue-${i.severity}`}><b>{i.severity}</b>: {i.message}</li>)}</ul>
             )}
-            <h3 style={{ marginTop: 12 }}>Equipment needed</h3>
-            {report.equipmentUsage.length === 0 ? <p className="muted">None.</p> : (
-              <ul className="plain">{report.equipmentUsage.map((u) => <li key={u.equipment.id}>{u.equipment.name} ({u.equipment.kind === 'company' ? 'company-specific' : 'standard'}): {u.testCaseIds.length} test(s)</li>)}</ul>
+          </div>
+
+          <div className="panel">
+            <div className="toolbar">
+              <h3 style={{ margin: 0 }}>Required test equipment</h3>
+              <span className="spacer" />
+              <button
+                disabled={!draft.id || (equip.items.length === 0 && equip.missing.length === 0)}
+                onClick={async () => {
+                  try {
+                    if (dirty) await save();
+                    const path = await window.api.exportEquipmentList(draft.id!);
+                    if (path) notify(`Exported to ${path}`);
+                  } catch (e) {
+                    notify((e as Error).message, 'error');
+                  }
+                }}
+              >
+                Export equipment list (Excel)
+              </button>
+            </div>
+            {equip.items.length === 0 && equip.missing.length === 0 ? (
+              <p className="muted">No equipment needed yet. Link equipment to the test cases in this plan.</p>
+            ) : (
+              <>
+                <table className="grid">
+                  <thead><tr><th>Equipment</th><th>Kind</th><th>Calibration</th><th>Status</th><th className="num">Tests</th><th>Used by</th><th className="num">Min</th></tr></thead>
+                  <tbody>
+                    {equip.items.map((u) => (
+                      <tr key={u.equipment.id}>
+                        <td>{u.equipment.name}{u.equipment.model && <span className="muted"> {u.equipment.model}</span>}</td>
+                        <td><Badge kind={u.equipment.kind === 'company' ? 'company' : undefined}>{u.equipment.kind === 'company' ? 'Company-specific' : 'Standard'}</Badge></td>
+                        <td>{u.calibration === 'none' ? <span className="muted">not required</span> : <Badge kind={u.calibration === 'ok' ? 'ok' : u.calibration === 'due-soon' ? 'warn' : 'err'}>{u.equipment.calibrationDue}</Badge>}</td>
+                        <td><Badge kind={u.equipment.status === 'available' ? 'ok' : u.equipment.status === 'in_repair' ? 'err' : 'warn'}>{u.equipment.status.replace(/_/g, ' ')}</Badge></td>
+                        <td className="num">{u.testCaseIds.length}</td>
+                        <td>{u.testCaseIds.map((id) => <Badge key={id}>{data.testCases.find((t) => t.id === id)?.tid}</Badge>)}</td>
+                        <td className="num">{u.minutes}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {equip.missing.length > 0 && (
+                  <>
+                    <h3 style={{ marginTop: 12 }}>Equipment to obtain (not in the catalogue)</h3>
+                    <table className="grid">
+                      <thead><tr><th>Needed</th><th>Used by</th><th>Requirements</th></tr></thead>
+                      <tbody>
+                        {equip.missing.map((m) => (
+                          <tr key={m.need}>
+                            <td>{m.need}</td>
+                            <td>{m.testCaseIds.map((id) => <Badge key={id} kind="warn">{data.testCases.find((t) => t.id === id)?.tid}</Badge>)}</td>
+                            <td>{m.requirementIds.map((id) => <Badge key={id}>{data.requirements.find((r) => r.id === id)?.reqId}</Badge>)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </>
+                )}
+              </>
             )}
           </div>
         </div>

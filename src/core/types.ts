@@ -75,6 +75,8 @@ export interface TestCase extends Audit {
   environment: string;
   requirementIds: string[];
   equipmentIds: string[];
+  /** Instruments the test needs that are not (yet) in the equipment catalogue. */
+  missingEquipment?: string[];
   status: TestStatus;
   estimatedMinutes: number;
   /** Set when a linked requirement changed after the test was written. */

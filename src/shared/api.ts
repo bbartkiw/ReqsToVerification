@@ -47,6 +47,7 @@ export interface Api {
 
   exportPlanXlsx(planId: string): Promise<string | null>;
   exportPlanPdf(planId: string): Promise<string | null>;
+  exportEquipmentList(planId: string): Promise<string | null>;
 }
 
 export type ApiMethod = keyof Api;
@@ -71,4 +72,5 @@ export const API_METHODS: ApiMethod[] = [
   'deletePlan',
   'exportPlanXlsx',
   'exportPlanPdf',
+  'exportEquipmentList',
 ];
