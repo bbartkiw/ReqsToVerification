@@ -3,7 +3,10 @@ import { describe, expect, it } from 'vitest';
 import ExcelJS from 'exceljs';
 import { analysePlan, calibrationState, coverage, equipmentList, selectTestsByScope, suggestOrder } from '../src/core/analysis';
 import { buildEquipmentWorkbook, buildPlanHtml, buildPlanWorkbook } from '../src/core/export';
+import { proposeEquipment } from '../src/core/equipmentGen';
 import { extractLimits, generateTestCases } from '../src/core/generate';
+import { buildSpecification } from '../src/core/specification';
+import { specToDocx, specToHtml } from '../src/core/specRender';
 import { csvSource, excelSource, guessMapping, mapRows, parseStandards } from '../src/core/importers';
 import { MemoryRepository } from '../src/core/repository';
 import { ProjectService } from '../src/core/service';
@@ -137,6 +140,45 @@ describe('test case generation', () => {
     await wb.xlsx.load((await buildEquipmentWorkbook(svc.getData(), plan!)) as unknown as ArrayBuffer);
     expect(wb.worksheets.map((w) => w.name)).toEqual(['Required equipment', 'Equipment to obtain']);
     expect(analysePlan(svc.getData(), plan!).issues.some((i) => i.message.includes('not in catalogue'))).toBe(true);
+  });
+
+  it('creates catalogue equipment from plan needs and links the tests', async () => {
+    const svc = await loadSample();
+    const { plan } = await svc.createGenerated(generateTestCases(svc.getData()), 'P');
+    const proposed = proposeEquipment(svc.getData(), [plan!.id]);
+    const chamber = proposed.find((p) => p.key === 'climate chamber')!;
+    expect(chamber.kind).toBe('standard');
+    expect(proposed.find((p) => p.key.includes('fixture'))!.kind).toBe('company');
+    const res = await svc.createEquipmentFromNeeds(proposed);
+    expect(res.created).toBe(proposed.length);
+    expect(proposeEquipment(svc.getData())).toHaveLength(0);
+    const d = svc.getData();
+    expect(equipmentList(d, d.plans[0]).missing).toHaveLength(0);
+    expect(d.equipment.find((e) => e.name === 'Climate chamber')!.status).toBe('to_procure');
+    // running it again links to existing items instead of duplicating
+    const n = d.equipment.length;
+    await svc.createEquipmentFromNeeds(proposeEquipment(d));
+    expect(svc.getData().equipment).toHaveLength(n);
+  });
+
+  it('builds a test specification and renders it to Word and HTML', async () => {
+    const svc = await loadSample();
+    const { plan } = await svc.createGenerated(generateTestCases(svc.getData()), 'Spec plan');
+    const blocks = buildSpecification(svc.getData(), plan!, { author: 'A. Engineer', documentId: 'TS-1' });
+    const heads = blocks.filter((b) => b.kind === 'h1').map((b) => (b as { text: string }).text);
+    expect(heads).toEqual([
+      '1 Introduction',
+      '2 Test equipment and environment',
+      '3 Test case overview',
+      '4 Test case specifications',
+      '5 Requirements traceability',
+    ]);
+    const html = specToHtml(blocks, 'Spec');
+    expect(html).toContain('TS-1');
+    expect(html).toContain('SYS-004');
+    const docx = await specToDocx(blocks, 'Spec');
+    expect(docx.length).toBeGreaterThan(5000);
+    expect(String.fromCharCode(docx[0], docx[1])).toBe('PK'); // zip container
   });
 
   it('groups many requirements into one test and splits one into several', async () => {

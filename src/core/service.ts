@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { suggestOrder } from './analysis';
+import { needKey, type ProposedEquipment } from './equipmentGen';
 import type { ProposedTest } from './generate';
 import type { RequirementDraft } from './importers';
 import type { Repository } from './repository';
@@ -218,6 +219,47 @@ export class ProjectService {
     list.push(created);
     await this.commit('create', 'testCase', created.id, tid);
     return created;
+  }
+
+  /**
+   * Add catalogue entries for needed-but-missing equipment and link them to the
+   * tests that asked for them (removing the note from those tests).
+   */
+  async createEquipmentFromNeeds(items: ProposedEquipment[]): Promise<{ created: number; linked: number }> {
+    let created = 0;
+    let linked = 0;
+    for (const it of items) {
+      let eq = it.existingEquipmentId ? this.data.equipment.find((e) => e.id === it.existingEquipmentId) : undefined;
+      if (!eq) {
+        eq = {
+          id: randomUUID(),
+          name: it.name,
+          kind: it.kind,
+          category: it.category,
+          model: '',
+          serial: '',
+          calibrationDue: '',
+          status: it.status,
+          notes: 'Added from test plan needs. Complete model, serial and calibration data.',
+          ...this.stampNew(),
+        };
+        this.data.equipment.push(eq);
+        created++;
+      }
+      for (const t of this.data.testCases) {
+        const before = t.missingEquipment ?? [];
+        const rest = before.filter((m) => needKey(m) !== it.key);
+        if (rest.length !== before.length) {
+          t.missingEquipment = rest;
+          if (!t.equipmentIds.includes(eq.id)) t.equipmentIds.push(eq.id);
+          t.updatedAt = this.clock().toISOString();
+          t.updatedBy = this.user;
+          linked++;
+        }
+      }
+    }
+    await this.commit('generate', 'equipment', '', `${created} equipment item(s) created, ${linked} test link(s)`);
+    return { created, linked };
   }
 
   /** Create draft test cases from generator proposals (and optionally a plan holding them). */

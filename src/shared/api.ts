@@ -1,4 +1,6 @@
+import type { ProposedEquipment } from '../core/equipmentGen';
 import type { ProposedTest } from '../core/generate';
+import type { SpecOptions } from '../core/specification';
 import type { ColumnMapping, DraftIssue, RawTable } from '../core/importers';
 import type { ImportResult } from '../core/service';
 import type { Equipment, ProjectData, Requirement, TestCase, TestPlan } from '../core/types';
@@ -48,6 +50,8 @@ export interface Api {
   exportPlanXlsx(planId: string): Promise<string | null>;
   exportPlanPdf(planId: string): Promise<string | null>;
   exportEquipmentList(planId: string): Promise<string | null>;
+  createEquipmentFromNeeds(items: ProposedEquipment[]): Promise<ProjectInfo>;
+  exportSpecification(planId: string, format: 'pdf' | 'docx', options: Omit<SpecOptions, 'now'>): Promise<string | null>;
 }
 
 export type ApiMethod = keyof Api;

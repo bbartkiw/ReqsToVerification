@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { analysePlan, equipmentList, selectTestsByScope, suggestOrder } from '../../core/analysis';
 import { PLAN_STATUSES, type EquipmentScope, type TestPlan } from '../../core/types';
 import { Badge, Field, Select, useApp } from '../ui';
+import { EquipmentGenDialog } from './EquipmentGenDialog';
+import { SpecDialog } from './SpecDialog';
 
 const SCOPE_LABELS: Record<EquipmentScope, string> = {
   all: 'All equipment',
@@ -18,6 +20,8 @@ export function PlansView() {
   const [selId, setSelId] = useState<string | null>(data.plans[0]?.id ?? null);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [dirty, setDirty] = useState(false);
+  const [specOpen, setSpecOpen] = useState(false);
+  const [eqGenOpen, setEqGenOpen] = useState(false);
 
   useEffect(() => {
     const p = data.plans.find((x) => x.id === selId);
@@ -118,6 +122,7 @@ export function PlansView() {
               <button className="primary" onClick={save} disabled={!dirty || !draft.name.trim()}>Save plan</button>
               <button onClick={() => doExport('xlsx')} disabled={!draft.id}>Export Excel</button>
               <button onClick={() => doExport('pdf')} disabled={!draft.id}>Export PDF</button>
+              <button onClick={() => setSpecOpen(true)} disabled={!draft.id || dirty} title={dirty ? 'Save the plan first' : undefined}>Test specification...</button>
               <span className="spacer" />
               {draft.id && (
                 <button className="danger" onClick={async () => { if (confirm(`Delete plan "${draft.name}"?`)) { setDirty(false); if (await apply(window.api.deletePlan(draft.id!))) setSelId(null); } }}>Delete plan</button>
@@ -228,7 +233,11 @@ export function PlansView() {
                 </table>
                 {equip.missing.length > 0 && (
                   <>
-                    <h3 style={{ marginTop: 12 }}>Equipment to obtain (not in the catalogue)</h3>
+                    <div className="toolbar" style={{ marginTop: 12 }}>
+                      <h3 style={{ margin: 0 }}>Equipment to obtain (not in the catalogue)</h3>
+                      <span className="spacer" />
+                      <button disabled={!draft.id || dirty} onClick={() => setEqGenOpen(true)}>Add to equipment catalogue...</button>
+                    </div>
                     <table className="grid">
                       <thead><tr><th>Needed</th><th>Used by</th><th>Requirements</th></tr></thead>
                       <tbody>
@@ -250,6 +259,8 @@ export function PlansView() {
       ) : (
         <p className="muted">Select a plan or create a new one.</p>
       )}
+      {specOpen && draft?.id && <SpecDialog plan={draft as TestPlan} onClose={() => setSpecOpen(false)} />}
+      {eqGenOpen && draft?.id && <EquipmentGenDialog planId={draft.id} onClose={() => setEqGenOpen(false)} />}
     </div>
   );
 }

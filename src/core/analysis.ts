@@ -163,7 +163,7 @@ export function equipmentList(d: ProjectData, plan: TestPlan, now: Date = new Da
         calibration: cal,
         problems: [
           ...(cal === 'expired' ? [`calibration expired ${e.calibrationDue}`] : cal === 'due-soon' ? [`calibration due ${e.calibrationDue}`] : []),
-          ...(e.status === 'in_repair' ? ['in repair'] : e.status === 'to_be_built' ? ['still to be built'] : []),
+          ...(e.status === 'in_repair' ? ['in repair'] : e.status === 'to_be_built' ? ['still to be built'] : e.status === 'to_procure' ? ['still to be procured'] : []),
         ],
       };
       it.testCaseIds.push(t.id);
@@ -257,6 +257,8 @@ export function analysePlan(d: ProjectData, plan: TestPlan, now: Date = new Date
       issues.push({ severity: 'error', equipmentId: e.id, message: `${e.name} is in repair.` });
     if (e.status === 'to_be_built')
       issues.push({ severity: 'warning', equipmentId: e.id, message: `${e.name} has still to be built.` });
+    if (e.status === 'to_procure')
+      issues.push({ severity: 'warning', equipmentId: e.id, message: `${e.name} has still to be procured.` });
   }
 
   for (const m of equipmentList(d, plan, now).missing) {

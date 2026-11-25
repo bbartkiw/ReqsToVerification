@@ -3,6 +3,8 @@ import { promises as fs } from 'node:fs';
 import { basename, join } from 'node:path';
 import { buildEquipmentWorkbook, buildPlanHtml, buildPlanWorkbook } from '../core/export';
 import { importSources, mapRows, sourceForFile, guessMapping, type ColumnMapping, type RawTable } from '../core/importers';
+import { buildSpecification } from '../core/specification';
+import { specToDocx, specToHtml } from '../core/specRender';
 import { JsonFileRepository } from '../core/repository';
 import { applyImport, ProjectService } from '../core/service';
 import { API_METHODS, type Api, type ProjectInfo } from '../shared/api';
@@ -114,6 +116,29 @@ const handlers: Api = {
     const path = await pickSavePath('Export test plan', `${plan.name}-v${plan.version}`, 'xlsx', 'Excel');
     if (!path) return null;
     await fs.writeFile(path, await buildPlanWorkbook(service.getData(), plan));
+    shell.showItemInFolder(path);
+    return path;
+  },
+
+  createEquipmentFromNeeds: async (items) => (await service.createEquipmentFromNeeds(items), info()),
+
+  async exportSpecification(planId, format, options) {
+    const plan = findPlan(planId);
+    const path = await pickSavePath('Export test specification', `Test-Specification-${plan.name}-v${plan.version}`, format, format === 'pdf' ? 'PDF' : 'Word');
+    if (!path) return null;
+    const blocks = buildSpecification(service.getData(), plan, options);
+    const title = `Test Specification - ${plan.name}`;
+    if (format === 'docx') {
+      await fs.writeFile(path, await specToDocx(blocks, title));
+    } else {
+      const printWin = new BrowserWindow({ show: false, webPreferences: { sandbox: true, javascript: false } });
+      try {
+        await printWin.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(specToHtml(blocks, title))}`);
+        await fs.writeFile(path, await printWin.webContents.printToPDF({ pageSize: 'A4', printBackground: true, displayHeaderFooter: true, footerTemplate: '<div style="font-size:8px;width:100%;text-align:center"><span class="pageNumber"></span> / <span class="totalPages"></span></div>', headerTemplate: '<span></span>' }));
+      } finally {
+        printWin.destroy();
+      }
+    }
     shell.showItemInFolder(path);
     return path;
   },

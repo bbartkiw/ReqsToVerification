@@ -87,7 +87,7 @@ export interface TestCase extends Audit {
 export const EQUIPMENT_KINDS = ['standard', 'company'] as const;
 export type EquipmentKind = (typeof EQUIPMENT_KINDS)[number];
 
-export const EQUIPMENT_STATUSES = ['available', 'in_repair', 'to_be_built'] as const;
+export const EQUIPMENT_STATUSES = ['available', 'in_repair', 'to_be_built', 'to_procure'] as const;
 export type EquipmentStatus = (typeof EQUIPMENT_STATUSES)[number];
 
 export interface Equipment extends Audit {

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { calibrationState } from '../../core/analysis';
 import { EQUIPMENT_KINDS, EQUIPMENT_STATUSES, type Equipment } from '../../core/types';
 import { Badge, Field, Modal, Select, useApp } from '../ui';
+import { EquipmentGenDialog } from './EquipmentGenDialog';
 
 const KIND_LABELS = { standard: 'Standard', company: 'Company-specific' } as const;
 
@@ -14,6 +15,7 @@ export function EquipmentView() {
   const [kind, setKind] = useState('');
   const [q, setQ] = useState('');
   const [edit, setEdit] = useState<Partial<Equipment> | null>(null);
+  const [generating, setGenerating] = useState(false);
   const now = new Date();
   const rows = data.equipment.filter(
     (e) => (!kind || e.kind === kind) && `${e.name} ${e.category} ${e.model} ${e.serial}`.toLowerCase().includes(q.toLowerCase()),
@@ -30,7 +32,8 @@ export function EquipmentView() {
           <option value="company">Company-specific only</option>
         </select>
         <span className="spacer" />
-        <button className="primary" onClick={() => setEdit(blank())}>New equipment</button>
+        <button className="primary" onClick={() => setGenerating(true)}>Generate from test plans...</button>
+        <button onClick={() => setEdit(blank())}>New equipment</button>
       </div>
       <table className="grid">
         <thead><tr><th>Name</th><th>Kind</th><th>Category</th><th>Model / serial</th><th>Calibration</th><th>Status</th><th className="num">Tests</th><th /></tr></thead>
@@ -56,6 +59,7 @@ export function EquipmentView() {
         </tbody>
       </table>
       {edit && <EquipmentDialog initial={edit} onClose={() => setEdit(null)} />}
+      {generating && <EquipmentGenDialog onClose={() => setGenerating(false)} />}
     </>
   );
 }
@@ -81,7 +85,7 @@ function EquipmentDialog({ initial, onClose }: { initial: Partial<Equipment>; on
         <Field label="Name *">{(id) => <input id={id} value={e.name ?? ''} onChange={(x) => set('name', x.target.value)} />}</Field>
         <Field label="Kind">{(id) => <Select id={id} value={e.kind ?? 'standard'} options={EQUIPMENT_KINDS} labels={KIND_LABELS} onChange={(v) => set('kind', v)} />}</Field>
         <Field label="Category (oscilloscope, climate chamber, fixture...)">{(id) => <input id={id} value={e.category ?? ''} onChange={(x) => set('category', x.target.value)} />}</Field>
-        <Field label="Status">{(id) => <Select id={id} value={e.status ?? 'available'} options={EQUIPMENT_STATUSES} labels={{ available: 'available', in_repair: 'in repair', to_be_built: 'to be built' }} onChange={(v) => set('status', v)} />}</Field>
+        <Field label="Status">{(id) => <Select id={id} value={e.status ?? 'available'} options={EQUIPMENT_STATUSES} labels={{ available: 'available', in_repair: 'in repair', to_be_built: 'to be built', to_procure: 'to be procured' }} onChange={(v) => set('status', v)} />}</Field>
         <Field label="Model">{(id) => <input id={id} value={e.model ?? ''} onChange={(x) => set('model', x.target.value)} />}</Field>
         <Field label="Serial / asset number">{(id) => <input id={id} value={e.serial ?? ''} onChange={(x) => set('serial', x.target.value)} />}</Field>
         <Field label="Calibration due (blank if not required)">{(id) => <input id={id} type="date" value={e.calibrationDue ?? ''} onChange={(x) => set('calibrationDue', x.target.value)} />}</Field>
