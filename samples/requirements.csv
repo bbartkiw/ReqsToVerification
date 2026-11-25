@@ -1,0 +1,10 @@
+ID,Title,Requirement,Category,Level,Verification Method,Standards
+SYS-001,Power-on time,The device shall be operational within 5 s of power application.,Performance,System,Test,
+SYS-002,Operating temperature,The device shall operate from -20 C to +60 C.,Environmental,System,Test,IEC 60068 (Part 2-1; 2-2)
+SYS-003,Ingress protection,The enclosure shall meet IP65.,Environmental,System,Test,IEC 60529
+SYS-004,Emergency stop,The device shall stop all motion within 100 ms of an emergency stop input.,Safety,System,Test,ISO 13849 (PL d); EU Machinery Regulation 2023/1230
+SYS-005,EMC emissions,The device shall comply with radiated emission limits.,Regulatory,System,Test,EU EMC Directive 2014/30/EU; IEC 61000
+SYS-006,User manual,The device shall ship with a user manual in all EU languages.,Usability,System,Inspection,EU Machinery Regulation 2023/1230
+SYS-007,CAN interface,The device shall provide a CAN 2.0B interface at 500 kbit/s.,Interface,Subsystem,Test,
+SYS-008,MTBF,The device shall have an MTBF of at least 50000 h.,Reliability,System,Analysis,
+SYS-009,Start button,The device shall start a cycle when the start button is pressed.,Functional,Component,Demonstration,
