@@ -12,6 +12,7 @@ import {
 import type { ImportFileResult, ImportPreview } from '../../shared/api';
 import type { ImportResult } from '../../core/service';
 import { Badge, Field, Modal, Select, useApp } from '../ui';
+import { GenerateDialog } from './GenerateDialog';
 
 const FIELD_LABELS = {
   reqId: 'Requirement ID *',
@@ -33,6 +34,7 @@ export function RequirementsView() {
   const [nfr, setNfr] = useState('');
   const [edit, setEdit] = useState<Partial<Requirement> | null>(null);
   const [importing, setImporting] = useState(false);
+  const [generating, setGenerating] = useState(false);
 
   const covered = useMemo(() => coveredRequirementIds(data.testCases.filter((t) => t.status !== 'obsolete')), [data.testCases]);
   const rows = data.requirements.filter(
@@ -67,7 +69,8 @@ export function RequirementsView() {
         </select>
         <span className="spacer" />
         <span className="muted">{rows.length} of {data.requirements.length}</span>
-        <button onClick={() => setImporting(true)} className="primary">Import CSV / Excel...</button>
+        <button onClick={() => setImporting(true)}>Import CSV / Excel...</button>
+        <button className="primary" onClick={() => setGenerating(true)}>Generate test cases...</button>
         <button onClick={() => setEdit({ type: 'functional', level: 'system', verificationMethod: 'test', standards: [], title: '', text: '', reqId: '' })}>New requirement</button>
       </div>
 
@@ -97,6 +100,9 @@ export function RequirementsView() {
 
       {edit && <RequirementDialog initial={edit} onClose={() => setEdit(null)} />}
       {importing && <ImportDialog onClose={() => setImporting(false)} />}
+      {generating && (
+        <GenerateDialog onClose={() => setGenerating(false)} requirementIds={q || type || level || method || nfr ? rows.map((r) => r.id) : undefined} />
+      )}
     </>
   );
 }

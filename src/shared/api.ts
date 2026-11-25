@@ -1,3 +1,4 @@
+import type { ProposedTest } from '../core/generate';
 import type { ColumnMapping, DraftIssue, RawTable } from '../core/importers';
 import type { ImportResult } from '../core/service';
 import type { Equipment, ProjectData, Requirement, TestCase, TestPlan } from '../core/types';
@@ -36,6 +37,7 @@ export interface Api {
   saveRequirement(r: New<Requirement>): Promise<ProjectInfo>;
   deleteRequirement(id: string): Promise<ProjectInfo>;
   saveTestCase(t: New<TestCase>): Promise<ProjectInfo>;
+  createGeneratedTests(proposals: ProposedTest[], planName?: string): Promise<ProjectInfo>;
   clearSuspect(id: string): Promise<ProjectInfo>;
   deleteTestCase(id: string): Promise<ProjectInfo>;
   saveEquipment(e: New<Equipment>): Promise<ProjectInfo>;
@@ -60,6 +62,7 @@ export const API_METHODS: ApiMethod[] = [
   'saveRequirement',
   'deleteRequirement',
   'saveTestCase',
+  'createGeneratedTests',
   'clearSuspect',
   'deleteTestCase',
   'saveEquipment',

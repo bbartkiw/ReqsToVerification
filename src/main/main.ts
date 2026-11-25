@@ -101,6 +101,7 @@ const handlers: Api = {
   saveRequirement: async (r) => (await service.saveRequirement(r), info()),
   deleteRequirement: async (id) => (await service.deleteRequirement(id), info()),
   saveTestCase: async (t) => (await service.saveTestCase(t), info()),
+  createGeneratedTests: async (proposals, planName) => (await service.createGenerated(proposals, planName), info()),
   clearSuspect: async (id) => (await service.clearSuspect(id), info()),
   deleteTestCase: async (id) => (await service.deleteTestCase(id), info()),
   saveEquipment: async (e) => (await service.saveEquipment(e), info()),

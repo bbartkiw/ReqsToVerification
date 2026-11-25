@@ -1,4 +1,6 @@
 import { randomUUID } from 'node:crypto';
+import { suggestOrder } from './analysis';
+import type { ProposedTest } from './generate';
 import type { RequirementDraft } from './importers';
 import type { Repository } from './repository';
 import {
@@ -216,6 +218,47 @@ export class ProjectService {
     list.push(created);
     await this.commit('create', 'testCase', created.id, tid);
     return created;
+  }
+
+  /** Create draft test cases from generator proposals (and optionally a plan holding them). */
+  async createGenerated(proposals: ProposedTest[], planName?: string): Promise<{ tests: TestCase[]; plan?: TestPlan }> {
+    const tests: TestCase[] = [];
+    for (const p of proposals) {
+      const created: TestCase = {
+        id: randomUUID(),
+        tid: this.nextTid(),
+        title: p.title,
+        objective: p.objective,
+        preconditions: p.preconditions,
+        steps: p.steps,
+        passCriteria: p.passCriteria,
+        environment: p.environment,
+        requirementIds: p.requirementIds,
+        equipmentIds: p.equipmentIds,
+        status: 'draft',
+        estimatedMinutes: p.estimatedMinutes,
+        suspect: false,
+        ...this.stampNew(),
+      };
+      this.data.testCases.push(created);
+      tests.push(created);
+    }
+    let plan: TestPlan | undefined;
+    if (planName?.trim() && tests.length) {
+      plan = {
+        id: randomUUID(),
+        name: planName.trim(),
+        scope: 'Generated from requirements',
+        status: 'draft',
+        equipmentScope: 'all',
+        items: suggestOrder(this.data, tests.map((t) => t.id)).map((testCaseId, i) => ({ testCaseId, order: i + 1 })),
+        notes: '',
+        ...this.stampNew(),
+      };
+      this.data.plans.push(plan);
+    }
+    await this.commit('generate', 'testCase', '', `${tests.length} test case(s)${plan ? ` and plan "${plan.name}"` : ''}`);
+    return { tests, plan };
   }
 
   /** Reviewer confirms the test is still valid for the changed requirement(s). */

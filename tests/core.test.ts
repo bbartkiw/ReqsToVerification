@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import ExcelJS from 'exceljs';
 import { analysePlan, calibrationState, coverage, selectTestsByScope, suggestOrder } from '../src/core/analysis';
 import { buildPlanHtml, buildPlanWorkbook } from '../src/core/export';
+import { extractLimits, generateTestCases } from '../src/core/generate';
 import { csvSource, excelSource, guessMapping, mapRows, parseStandards } from '../src/core/importers';
 import { MemoryRepository } from '../src/core/repository';
 import { ProjectService } from '../src/core/service';
@@ -91,6 +92,47 @@ describe('re-import and suspect links', () => {
     expect(svc.getData().requirements.find((r) => r.reqId === 'SYS-001')!.version).toBe(2);
     await svc.clearSuspect(tc.id);
     expect(svc.getData().testCases[0].suspect).toBe(false);
+  });
+});
+
+describe('test case generation', () => {
+  it('extracts limits from requirement text', () => {
+    const l = extractLimits('The device shall operate from -20 C to +60 C and be operational within 5 s. IP65 enclosure.');
+    expect(l.ranges).toEqual([{ lo: '-20', hi: '+60', unit: 'C' }]);
+    expect(l.quantities).toMatchObject([{ value: '5', unit: 's', bound: 'max' }]);
+    expect(l.ipRatings).toEqual(['IP65']);
+  });
+
+  it('generates one test per uncovered requirement, using catalogue equipment', async () => {
+    const svc = await loadSample();
+    const chamber = await svc.saveEquipment({
+      name: 'Climate chamber', kind: 'company', category: 'Environmental', model: '', serial: '', calibrationDue: '', status: 'available', notes: '',
+    });
+    const proposals = generateTestCases(svc.getData());
+    expect(proposals).toHaveLength(6); // only requirements verified by test
+    const temp = proposals.find((p) => p.title.includes('Operating temperature'))!;
+    expect(temp.equipmentIds).toContain(chamber.id);
+    expect(temp.steps.some((s) => s.action.includes('-20'))).toBe(true);
+    const created = await svc.createGenerated(proposals, 'Gen plan');
+    expect(created.tests).toHaveLength(6);
+    expect(created.tests.every((t) => t.status === 'draft')).toBe(true);
+    expect(created.plan?.items).toHaveLength(6);
+    expect(coverage(svc.getData()).percent).toBe(100);
+    expect(generateTestCases(svc.getData())).toHaveLength(0); // everything covered now
+  });
+
+  it('groups many requirements into one test and splits one into several', async () => {
+    const svc = await loadSample();
+    const grouped = generateTestCases(svc.getData(), { grouping: 'by-type', maxRequirementsPerTest: 5 });
+    expect(grouped.length).toBeLessThan(6);
+    expect(grouped.some((p) => p.requirementIds.length > 1) || grouped.length === 6).toBe(true);
+    const env = generateTestCases(svc.getData(), { grouping: 'by-type', scope: 'all-verifiable' }).find((p) => p.title.includes('Environmental'))!;
+    expect(env.requirementIds).toHaveLength(2); // SYS-002 and SYS-003
+
+    const split = generateTestCases(svc.getData(), { splitCases: true });
+    expect(split.length).toBeGreaterThan(6);
+    const standardOnly = generateTestCases(svc.getData(), { equipmentPreference: 'standard' });
+    expect(standardOnly.some((p) => p.missingEquipment.length > 0)).toBe(true);
   });
 });
 

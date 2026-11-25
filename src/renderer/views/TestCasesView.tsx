@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { TEST_STATUSES, type TestCase } from '../../core/types';
 import { Badge, Field, Modal, MultiPicker, Select, useApp } from '../ui';
+import { GenerateDialog } from './GenerateDialog';
 
 const blank = (): Partial<TestCase> => ({
   tid: '',
@@ -22,6 +23,7 @@ export function TestCasesView() {
   const [q, setQ] = useState('');
   const [flt, setFlt] = useState('');
   const [edit, setEdit] = useState<Partial<TestCase> | null>(null);
+  const [generating, setGenerating] = useState(false);
 
   const reqLabel = (id: string) => data.requirements.find((r) => r.id === id)?.reqId ?? '?';
   const eq = (id: string) => data.equipment.find((e) => e.id === id);
@@ -47,7 +49,8 @@ export function TestCasesView() {
           <option value="company">Uses company-specific equipment</option>
         </select>
         <span className="spacer" />
-        <button className="primary" onClick={() => setEdit(blank())}>New test case</button>
+        <button className="primary" onClick={() => setGenerating(true)}>Generate from requirements...</button>
+        <button onClick={() => setEdit(blank())}>New test case</button>
       </div>
       <table className="grid">
         <thead><tr><th>ID</th><th>Title</th><th>Requirements</th><th>Equipment</th><th className="num">Min</th><th>Status</th><th /></tr></thead>
@@ -70,6 +73,7 @@ export function TestCasesView() {
         </tbody>
       </table>
       {edit && <TestCaseDialog initial={edit} onClose={() => setEdit(null)} />}
+      {generating && <GenerateDialog onClose={() => setGenerating(false)} />}
     </>
   );
 }
